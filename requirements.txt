@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+langchain-openai
+browser-use
+python-dotenv
+aiofiles
+httpx

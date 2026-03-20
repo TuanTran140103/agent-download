@@ -1,0 +1,70 @@
+services:
+  # Chrome CDP Browser - Dùng browserless image hỗ trợ CDP remote
+  chrome-cdp:
+    image: browserless/chrome:latest
+    container_name: chrome-cdp-browser
+    ports:
+      - "9223:3000"
+    environment:
+      - CONNECTION_TIMEOUT=-1
+      - MAX_CONCURRENT_SESSIONS=10
+      - ENABLE_DEBUGGER=true
+      - PREBOOT_CHROME=true
+      - DEFAULT_LAUNCH_ARGS=["--no-sandbox","--disable-gpu","--disable-dev-shm-usage","--remote-allow-origins=*","--host-resolver-rules=MAP host.docker.internal host-gateway.docker.internal"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/json/version"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # Container chứa App Agent của bạn
+  seabank-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: seabank-agent-app:v1.2
+    container_name: seabank-agent-app
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./downloads:/app/downloads
+      - ./logs:/app/logs
+      - ./main.py:/app/main.py
+      - ./agent_runner.py:/app/agent_runner.py
+      - ./static:/app/static
+    depends_on:
+      chrome-cdp:
+        condition: service_healthy
+    environment:
+      # Kết nối tới CDP proxy trong cùng Docker network
+      - CHROME_CDP_URL=http://chrome-cdp:3000
+      # URL để kết nối tới Ollama (mặc định trỏ về máy ảo Host)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-your_key_here}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      # Paperless-ngx connection
+      - PAPERLESS_BASE_URL=http://paperless-web:8000
+    restart: unless-stopped
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "vanban.seabank.com.vn:10.9.11.111"
+    networks:
+      - agent-network
+      - paperless_paperless_net
+
+networks:
+  agent-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.5.0/24
+  
+  paperless_paperless_net:
+    external: true
