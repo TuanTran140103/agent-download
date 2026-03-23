@@ -21,6 +21,43 @@ from models.paperless_models import (
 class PaperlessService:
     """Service for interacting with Paperless-ngx API"""
 
+    # MIME type mapping for common document formats
+    MIME_TYPES = {
+        # PDF
+        '.pdf': 'application/pdf',
+        # Microsoft Word
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        # Microsoft Excel
+        '.xls': 'application/vnd.ms-excel',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        # Microsoft PowerPoint
+        '.ppt': 'application/vnd.ms-powerpoint',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        # OpenDocument
+        '.odt': 'application/vnd.oasis.opendocument.text',
+        '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+        '.odp': 'application/vnd.oasis.opendocument.presentation',
+        # Images
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.tiff': 'image/tiff',
+        '.bmp': 'image/bmp',
+        # Text
+        '.txt': 'text/plain',
+        '.csv': 'text/csv',
+        '.rtf': 'application/rtf',
+        # HTML
+        '.html': 'text/html',
+        '.htm': 'text/html',
+        # XML
+        '.xml': 'application/xml',
+        # JSON
+        '.json': 'application/json',
+    }
+
     def __init__(
         self,
         base_url: Optional[str] = None,
@@ -60,6 +97,29 @@ class PaperlessService:
         return {
             "Authorization": self.auth_header,
         }
+
+    @staticmethod
+    def _get_mime_type(file_path: str) -> str:
+        """
+        Get MIME type based on file extension
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            MIME type string (e.g., 'application/pdf')
+        """
+        import mimetypes
+
+        # First try Python's built-in mimetypes
+        mime_type, _ = mimetypes.guess_type(file_path)
+
+        if mime_type:
+            return mime_type
+
+        # Fallback to our custom mapping
+        ext = os.path.splitext(file_path)[1].lower()
+        return PaperlessService.MIME_TYPES.get(ext, 'application/octet-stream')
     
     async def check_auth(self) -> PaperlessAuthResponse:
         """
@@ -158,20 +218,46 @@ class PaperlessService:
         url = f"{self.base_url}/api/documents/post_document/"
 
         if not os.path.exists(file_path):
+            print(f"   ❌ File not found: {file_path}")
             return PaperlessUploadResponse(
                 success=False,
                 message="File not found",
                 file_path=file_path
             )
 
+        # Detect MIME type based on file extension
+        mime_type = self._get_mime_type(file_path)
+        print(f"   📋 Detected MIME type: {mime_type}")
+
         try:
             async with httpx.AsyncClient(
                 timeout=self.timeout,
                 verify=self.verify_ssl
             ) as client:
-                # Prepare form data
                 with open(file_path, "rb") as f:
-                    files = {"document": f}
+                    file_content = f.read()
+                    
+                    # Debug: print first few bytes to see if it's actually a PDF
+                    file_header = file_content[:32]
+                    print(f"   🔢 File headers: {file_header!r}")
+                    
+                    # 🛡️ VALIDATION: Check if it's a real PDF when the extension says so
+                    if mime_type == 'application/pdf' and not file_header.startswith(b'%PDF-'):
+                        print(f"   ❌ ERROR: Downloaded file is HTML/Text, not a valid PDF!")
+                        return {
+                            "success": False,
+                            "error": f"Downloaded file is invalid (received HTML/Text instead of PDF). It might be an error or preview page. Starts with: {file_header[:20]!r}",
+                            "file_path": file_path
+                        }
+                    
+                    # Sanitize filename for the multipart header to avoid issues with non-ASCII
+                    # Paperless prefers the 'title' field anyway, or correctly handles the filename.
+                    safe_filename = os.path.basename(file_path).encode('ascii', 'ignore').decode('ascii') or "document.pdf"
+                    
+                    files = {
+                        "document": (safe_filename, file_content, mime_type)
+                    }
+                    
                     data = {}
 
                     if title:
@@ -181,34 +267,29 @@ class PaperlessService:
                         data["created"] = created
 
                     if correspondent_id is not None:
-                        data["correspondent"] = correspondent_id
+                        data["correspondent"] = str(correspondent_id)
 
                     if document_type_id is not None:
-                        data["document_type"] = document_type_id
+                        data["document_type"] = str(document_type_id)
 
                     if storage_path_id is not None:
-                        data["storage_path"] = storage_path_id
+                        data["storage_path"] = str(storage_path_id)
 
                     if tag_ids:
-                        # Can specify multiple times for multiple tags
-                        for tag_id in tag_ids:
-                            if "tags" not in data:
-                                data["tags"] = []
-                            data["tags"].append(tag_id)
+                        # For multipart, we need to send tags as multiple fields
+                        data["tags"] = [str(tid) for tid in tag_ids]
 
                     if archive_serial_number is not None:
-                        data["archive_serial_number"] = archive_serial_number
+                        data["archive_serial_number"] = str(archive_serial_number)
 
-                    # Add metadata to custom_fields if provided
-                    # Paperless requires custom_fields as list of {field: int, value: string}
-                    # or object mapping field_id -> value
-                    if metadata:
-                        # Note: This requires custom fields to be created in Paperless admin first
-                        # For now, we skip custom_fields and just use title
-                        print(f"   ⚠️ Metadata provided but custom_fields need field IDs. Using title only.")
-                        print(f"   ℹ️ Metadata: {metadata}")
-                    elif custom_fields:
+                    if custom_fields:
                         data["custom_fields"] = custom_fields
+
+                    print(f"   📤 POST {url}")
+                    print(f"   File: {file_path} ({len(file_content)} bytes)")
+                    print(f"   Multipart Filename: {safe_filename}")
+                    print(f"   Title: {title}")
+                    print(f"   MIME Type: {mime_type}")
 
                     response = await client.post(
                         url,
@@ -217,11 +298,14 @@ class PaperlessService:
                         data=data if data else None
                     )
 
+                    print(f"   Response status: {response.status_code}")
+                    print(f"   Response body: {response.text[:500]}")
+
                 if response.status_code == 200:
                     result = response.json()
                     print(f"   Upload response type: {type(result)}")
                     print(f"   Upload response: {result}")
-                    
+
                     # Handle both dict and string responses
                     if isinstance(result, dict):
                         task_uuid = result.get("uuid") or result.get("id")
@@ -229,7 +313,7 @@ class PaperlessService:
                         task_uuid = result  # UUID returned as string
                     else:
                         task_uuid = str(result)
-                    
+
                     return {
                         "success": True,
                         "task_uuid": task_uuid,
@@ -239,14 +323,17 @@ class PaperlessService:
                         "metadata": metadata  # Return metadata for later use
                     }
                 else:
+                    print(f"   ❌ Upload failed: {response.status_code}")
+                    print(f"   Error response: {response.text}")
                     return {
                         "success": False,
                         "status_code": response.status_code,
                         "error": response.text,
                         "file_path": file_path
                     }
-                    
+
         except httpx.RequestError as e:
+            print(f"   ❌ Connection error: {e}")
             return {
                 "success": False,
                 "error": str(e),

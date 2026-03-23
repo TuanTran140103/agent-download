@@ -92,13 +92,21 @@ try:
         return await _orig_dw_get_unique(directory, sanitize_filename(filename))
     dw.DownloadsWatchdog._get_unique_filename = _patched_dw_get_unique
     
-    # 3. Patch download_file_from_url (cho network-detected downloads)
-    _orig_dw_download = dw.DownloadsWatchdog.download_file_from_url
+    # 3. Patch download_file_from_url (CHẶN cơ chế tự tải bằng httpx của browser-use)
+    # Nguyên nhân: download_file_from_url dùng httpx độc lập, bị mất Cookie/Session 
+    # dẫn đến việc tải nhầm trang HTML login thay vì file PDF.
     async def _patched_dw_download(self, url, target_id, content_type=None, suggested_filename=None):
-        if suggested_filename:
-            suggested_filename = sanitize_filename(suggested_filename)
-        return await _orig_dw_download(self, url, target_id, content_type, suggested_filename)
+        logging.info(f"🚀 Bypassing manual download for {url} to prevent GET fetch() from downloading HTML")
+        # Trả về None để ép browser-use dùng cơ chế native download của Playwright
+        return None
     dw.DownloadsWatchdog.download_file_from_url = _patched_dw_download
+    
+    # Bổ sung: Patch cả trigger_pdf_download vì nó cũng dùng fetch(URL) bằng GET,
+    # gây ra lỗi tải file HTML đối với các trang ASP.NET
+    async def _patched_trigger_pdf_download(self, target_id):
+        logging.info(f"🚀 Bypassing trigger_pdf_download to prevent GET fetch() from downloading HTML")
+        return None
+    dw.DownloadsWatchdog.trigger_pdf_download = _patched_trigger_pdf_download
     
     # 4. Patch CDP download events
     _orig_dw_handle_cdp = dw.DownloadsWatchdog._handle_cdp_download
@@ -108,7 +116,7 @@ try:
         return await _orig_dw_handle_cdp(self, event, target_id, session_id)
     dw.DownloadsWatchdog._handle_cdp_download = _patched_dw_handle_cdp
     
-    logging.info("✅ Successfully applied filename sanitization patch to browser-use")
+    logging.info("✅ Successfully applied filename sanitization and download bypass patch to browser-use")
 except Exception as e:
     logging.warning(f"⚠️ Could not patch browser-use: {e}")
 # ==============================================================================
@@ -136,6 +144,14 @@ async def run_browser_task(
         #   browser-use-exec:   ../seabank_agent_app/seabank_agent_app/downloads:/app/downloads
         job_download_dir = os.path.join(DOWNLOADS_DIR, job_id)
         os.makedirs(job_download_dir, exist_ok=True)
+        
+        # Sửa lỗi Permission Denied khi Browserless tải file:
+        # Browserless chạy dưới quyền non-root, trong khi thu mục được tạo bởi app chạy quyền root.
+        # Cần cấp quyền 777 để Browserless có thể lưu file vào đây.
+        try:
+            os.chmod(job_download_dir, 0o777)
+        except Exception as chmod_e:
+            bu_logger.warning(f"⚠️ Could not chmod 777 on {job_download_dir}: {chmod_e}")
 
         # ── 1. LLM ──────────────────────────────────────────────────────────
         llm = ChatOpenAI(
@@ -189,6 +205,27 @@ async def run_browser_task(
         # Run agent với check stop request
         result = await agent.run(max_steps=BrowserConfig.MAX_STEPS)
 
+        # Chờ trình duyệt xử lý xong tác vụ tải file ngầm (nếu có)
+        bu_logger.info("⏳ Chờ Playwright hoàn tất tải file chạy ngầm...")
+        import asyncio
+        start_wait = 0
+        
+        # Đợi 5s đầu tiên để Playwright kịp bắt sự kiện tải và đẩy file vào thư mục
+        await asyncio.sleep(5)
+        
+        # Tiếp tục chờ nếu có file đang tải dở dạng .crdownload hoặc .tmp
+        download_wait = 0
+        max_download_wait = 120  # Tối đa chờ 2 phút
+        while download_wait < max_download_wait:
+            files_in_dir = os.listdir(job_download_dir)
+            if any(f.endswith('.crdownload') or f.endswith('.tmp') for f in files_in_dir):
+                if download_wait % 10 == 0:
+                    bu_logger.info(f"⏳ File vẫn đang tải, giữ nguyên trình duyệt... (đã chờ {download_wait}s)")
+                await asyncio.sleep(2)
+                download_wait += 2
+            else:
+                break
+
         # Check stop request sau khi run xong
         if is_stop_requested(job_id):
             bu_logger.info(f"⏹️ Job {job_id} đã được dừng theo yêu cầu")
@@ -219,7 +256,22 @@ async def run_browser_task(
             for filename in downloaded_files:
                 file_path = os.path.join(job_download_dir, filename)
                 if os.path.isfile(file_path):
-                    bu_logger.info(f"� Uploading {filename} to Paperless...")
+                    # Bỏ phần timestamp _103839 ở cuối filename để Paperless báo duplicate chính xác
+                    import re
+                    new_filename = re.sub(r'_\d{6}(\.[a-zA-Z0-9]+)$', r'\1', filename)
+                    if new_filename != filename:
+                        new_file_path = os.path.join(job_download_dir, new_filename)
+                        try:
+                            if os.path.exists(new_file_path):
+                                os.remove(new_file_path)
+                            os.rename(file_path, new_file_path)
+                            filename = new_filename
+                            file_path = new_file_path
+                            bu_logger.info(f"🔄 Đã đổi tên chuẩn hóa: {filename}")
+                        except Exception as e:
+                            bu_logger.warning(f"⚠️ Lỗi đổi tên file: {e}")
+                
+                    bu_logger.info(f"🚀 Uploading {filename} to Paperless...")
                     
                     try:
                         # Import service và helper

@@ -158,10 +158,12 @@ function handleJobComplete(data) {
     elements.resultBlock.style.display = 'block';
 
     // Parse result if it's JSON
-    let resultDisplay = data.result;
+    let resultDisplay = data.result || "Không có dữ liệu trả về từ AI.";
     try {
         if (typeof data.result === 'string') {
-            const parsed = JSON.parse(data.result);
+            // Strip markdown formatting if any
+            let cleanStr = data.result.replace(/^```[a-z]*\n/i, '').replace(/\n```$/g, '').trim();
+            const parsed = JSON.parse(cleanStr);
             resultDisplay = JSON.stringify(parsed, null, 2);
         }
     } catch (e) {
@@ -169,6 +171,47 @@ function handleJobComplete(data) {
     }
 
     elements.resultText.innerText = resultDisplay;
+
+    // Hiển thị thông báo Paperless nếu có
+    const paperlessStatusDiv = document.getElementById('paperlessUploadStatus');
+    const paperlessListDiv = document.getElementById('paperlessResultsList');
+    
+    if (paperlessStatusDiv && paperlessListDiv) {
+        if (data.paperless_results && data.paperless_results.length > 0) {
+            paperlessStatusDiv.style.display = 'block';
+            paperlessListDiv.innerHTML = '';
+            
+            data.paperless_results.forEach(r => {
+                const item = document.createElement('div');
+                item.style.padding = '10px';
+                item.style.marginTop = '10px';
+                item.style.borderRadius = '5px';
+                item.style.border = '1px solid #ddd';
+                
+                if (r.success) {
+                    item.style.backgroundColor = '#e8f5e9';
+                    item.style.borderColor = '#c8e6c9';
+                    item.innerHTML = `<strong>✅ Thành công</strong><br>
+                                      Tên file: <span>${r.file}</span><br>
+                                      Document ID: <strong>#${r.document_id}</strong><br>
+                                      <small>${r.message}</small>`;
+                } else {
+                    item.style.backgroundColor = '#ffebee';
+                    item.style.borderColor = '#ffcdd2';
+                    item.innerHTML = `<strong>❌ Thất bại</strong><br>
+                                      Tên file: <span>${r.file}</span><br>
+                                      Lỗi: <span style="color:#c62828;">${r.error || 'Server không phản hồi'}</span>`;
+                }
+                paperlessListDiv.appendChild(item);
+            });
+        } else {
+            paperlessStatusDiv.style.display = 'none';
+            if (data.paperless_message) {
+                paperlessStatusDiv.style.display = 'block';
+                paperlessListDiv.innerHTML = `<div style="padding: 10px; border: 1px solid #ddd; border-radius: 5px;">${data.paperless_message}</div>`;
+            }
+        }
+    }
 
     // Set appropriate class based on status
     if (data.status === 'completed') {
@@ -179,27 +222,7 @@ function handleJobComplete(data) {
         elements.resultBlock.className = 'result-card error';
     }
 
-    // Hiển thị thông báo Paperless nếu có
-    if (data.paperless_message) {
-        appendToTerminal(`\n\n${data.paperless_message}\n`);
-        
-        // Hiển thị chi tiết từng file
-        if (data.paperless_results && Array.isArray(data.paperless_results)) {
-            data.paperless_results.forEach(r => {
-                if (r.success) {
-                    appendToTerminal(`\n✅ ${r.file} → Document #${r.document_id}`);
-                    if (r.custom_fields_updated) {
-                        appendToTerminal(`   📝 Custom fields updated`);
-                    }
-                } else {
-                    appendToTerminal(`\n❌ ${r.file}: ${r.error || 'Upload failed'}`);
-                }
-            });
-        }
-        
-        // Scroll to bottom to show new messages
-        scrollToBottom();
-    }
+    scrollToBottom();
 }
 
 /**

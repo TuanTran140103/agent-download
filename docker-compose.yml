@@ -11,6 +11,8 @@ services:
       - ENABLE_DEBUGGER=true
       - PREBOOT_CHROME=true
       - DEFAULT_LAUNCH_ARGS=["--no-sandbox","--disable-gpu","--disable-dev-shm-usage","--remote-allow-origins=*","--host-resolver-rules=MAP host.docker.internal host-gateway.docker.internal"]
+    volumes:
+      - ./downloads:/app/downloads  # Mount downloads folder để chia sẻ file với agent
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -21,6 +23,20 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+
+  # Network Checker - Tool để test kết nối network
+  network-checker:
+    image: network-checker-full:v1.0
+    container_name: network-checker-tool
+    ports:
+      - "8080:80"
+    environment:
+      - TARGET_HOST=paperless-webserver-1
+      - TARGET_PORT=8000
+    networks:
+      - paperless_default
+      - agent-network
+    restart: unless-stopped
 
   # Container chứa App Agent của bạn
   seabank-agent:
@@ -47,8 +63,8 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-your_key_here}
       - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
-      # Paperless-ngx connection
-      - PAPERLESS_BASE_URL=http://paperless-web:8000
+      # Paperless-ngx connection (trong cùng network)
+      - PAPERLESS_BASE_URL=http://paperless-webserver-1:8000
     restart: unless-stopped
     env_file:
       - .env
@@ -57,7 +73,7 @@ services:
       - "vanban.seabank.com.vn:10.9.11.111"
     networks:
       - agent-network
-      - paperless_paperless_net
+      - paperless_default
 
 networks:
   agent-network:
@@ -66,5 +82,5 @@ networks:
       config:
         - subnet: 192.168.5.0/24
   
-  paperless_paperless_net:
+  paperless_default:
     external: true

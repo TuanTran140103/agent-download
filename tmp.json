@@ -1,0 +1,131 @@
+[
+  {
+    "bbox": [
+      261,
+      126,
+      738,
+      233
+    ],
+    "category": "Page-header",
+    "text": "SeABank"
+  },
+  {
+    "bbox": [
+      1047,
+      133,
+      1868,
+      194
+    ],
+    "category": "Page-header",
+    "text": "Tài liệu đặc tả yêu cầu người dùng (URD)"
+  },
+  {
+    "bbox": [
+      1949,
+      123,
+      2238,
+      179
+    ],
+    "category": "Page-header",
+    "text": "CÔNG CỘNG"
+  },
+  {
+    "bbox": [
+      277,
+      277,
+      843,
+      327
+    ],
+    "category": "Page-header",
+    "text": "Mã hiệu: H_99_14_55_01_xxxx"
+  },
+  {
+    "bbox": [
+      1047,
+      274,
+      1510,
+      327
+    ],
+    "category": "Page-header",
+    "text": "Ngày hiệu lực: 07/03/2025"
+  },
+  {
+    "bbox": [
+      1643,
+      270,
+      2115,
+      321
+    ],
+    "category": "Page-header",
+    "text": "Lần ban hành/sửa đổi: 1/0"
+  },
+  {
+    "bbox": [
+      81,
+      426,
+      2409,
+      3005
+    ],
+    "category": "Table",
+    "text": "<table><tr><td>12,13.<br/>1,</td><td>SB</td><td><p>- Đầu vào: mã Customer ID</p><p>- Thực hiện: Kiểm tra KH có TKTT chưa?</p><table><thead><tr><td>Nếu</td><td>Thì</td></tr></thead><tbody><tr><td>Đã có TKTT</td><td>Chuyển bước (13.1) – Hiển thị màn hình điền thông tin đăng ký mở EBANK.<br/>→ Chuyển tiếp Quy trình đăng ký mở eBank cho KH đã có TKTT.</td></tr><tr><td>Chưa có TKTT</td><td>Chuyển bước 13.2 – Hệ thống Hiển thị màn hình đăng ký dịch vụ Combo cho Khách hàng.</td></tr></tbody></table></td></tr><tr><td>13.2</td><td>SB</td><td><p>Màn hình đăng ký các dịch vụ combo khi mở ekyc:Hiển thị danh sách các dịch vụ đi kèm để KH lựa chon đăng ký.</p><p>Danh sách dịch vụ đi kèm này sẽ được cấu hình theo yêu cầu tai muc 1.3 trong tài liệu này (các dịch vụ có trạng thái = ACTIVE). Thứ tự Hiển thị các nhóm sản phẩm, sản phẩm mặc định Hiển thị của từng nhóm, nội dung mô tả cho từng nhóm sản phẩm được Hiển thị theo cấu hình mô tại tại mục 1.3</p><p>- Trường hợp mỗi nhóm sản phẩm có nhiều hơn 1 sản phẩm thì Hiển thị như sau:</p><table><thead><tr><td>STT</td><td>Ảnh mockup</td><td>Mô tả mockup</td></tr></thead><tbody><tr><td>1</td><td><img src=\"https://i.imgur.com/12345.png\" alt=\"Mockup of a mobile app interface for a financial service. The screen shows a red header with white text that reads 'Đăng ký dịch vụ, tiện ích'. Below the header, there are four sections with icons and text. The first section has an icon of a credit card and text that reads 'Mở tài khoản thanh toán định kèm dịch vụ Ebank'. The second section has an icon of a bell and text that reads 'Đăng ký nhận thông báo biến động số dư qua SMS và ứng dụng'. The third section has an icon of a document and text that reads 'Phí định ký (góm VAT): 33,000 VND/tháng. Xem chi tiết biểu phi tại đây'. The fourth section has an icon of a card and text that reads 'Phí được thu từ thông Quy客 đăng ký dịch vụ. Tin BĐSD sẽ gửi về SĐT và thiết bị Quy客 đang dùng.''. The fourth section also has a button labeled 'Chọn sản phẩm khác' with an arrow pointing to the next section. The fifth section has an icon of a credit card and text that reads 'The Ghi nợ - Visa Gold Debit'. The sixth section has an icon of a document and text that reads 'Hoàn tiến lên đến 1%. Niều ưu đãi hấp dẫn. Chi tiết tại đây'. The seventh section has an icon of a card and text that reads 'The Tín dụng - \"Tên thể\"'. The eighth section has an icon of a credit card and text that reads 'Hoàn tiến lên đến 3%. Niều ưu đãi hấp dẫn. Chi tiết tại đây'. The ninth section has an icon of a card and text that reads 'The Đa năng - \"Tên thể\"'. Phi giao dịch ngoại tệ chỉ 1.65%. Niều ưu đãi hấp dẫn. Chi tiết tại đây'. The tenth section has a button labeled 'Tiếp tục'.</td><td><p><strong>A. Tiêu đề:</strong><br/>VN: “Đăng ký dịch vụ, tiện ích”<br/>EG: “Registration of services”</p><p><strong>B. Vùng nội dung Hiển thị</strong><br/>-Hiển thị các sản phẩm có status=\"ACTIVE\", sắp xếp theo [Thứ tự xuất hiện] giá trị tăng dẫn từ 1 tới n.<br/>-Mô tả các trường tương ứng sẽ được cấu hình tại mục 1.3 sẽ Hiển thị lên giao diện như sau:</p></td></tr></tbody></table></td></tr></table>"
+  },
+  {
+    "bbox": [
+      762,
+      1890,
+      1300,
+      2993
+    ],
+    "category": "Picture"
+  },
+  {
+    "bbox": [
+      1103,
+      3182,
+      1413,
+      3239
+    ],
+    "category": "Page-footer",
+    "text": "Tài liệu Public"
+  },
+  {
+    "bbox": [
+      251,
+      3271,
+      1005,
+      3321
+    ],
+    "category": "Page-footer",
+    "text": "ĐVST: KHCN/SP Ekyc (Hoàng Thị Phượng)"
+  },
+  {
+    "bbox": [
+      1248,
+      3271,
+      1568,
+      3315
+    ],
+    "category": "Page-footer",
+    "text": "IP Phone: 04.8136"
+  },
+  {
+    "bbox": [
+      1655,
+      3271,
+      2283,
+      3321
+    ],
+    "category": "Page-footer",
+    "text": "Email: phuong.ht3@seabank.com.vn"
+  },
+  {
+    "bbox": [
+      2004,
+      3362,
+      2229,
+      3413
+    ],
+    "category": "Page-footer",
+    "text": "Trang 15/75"
+  }
+]

@@ -52,7 +52,6 @@ htmlcov/
 # Misc
 
 .env
-.env.*
 *.tar
 *.tar.gz
 
